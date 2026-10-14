@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    /* Subtle radial glows that keep the light canvas from feeling flat. */
+    background-image:
+      radial-gradient(900px 600px at 15% -10%, rgba(8, 145, 178, 0.06), transparent 60%),
+      radial-gradient(800px 600px at 110% 110%, rgba(59, 130, 246, 0.05), transparent 60%);
+  }
+
+  /* Custom scrollbar so panels match the light theme. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Frosted glass surface used by the legend, toolbar and drawer. */
+  .glass {
+    @apply bg-white/85 backdrop-blur-xl border border-slate-200;
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
+           transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500/50;
+  }
+  .btn-primary {
+    @apply btn bg-cyan-600 text-white hover:bg-cyan-500;
+  }
+  .btn-ghost {
+    @apply btn bg-white text-slate-700 hover:bg-slate-100 border border-slate-200;
+  }
+}
+
+/* Dotted grid used as the canvas background pattern (light theme). */
+.grid-overlay {
+  background-image: radial-gradient(rgba(100, 116, 139, 0.18) 1px, transparent 1px);
+  background-size: 26px 26px;
+}

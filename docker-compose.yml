@@ -1,0 +1,94 @@
+# Vectograph - Cybersecurity Architecture Mapping Tool
+# Zero-dependency setup: `docker compose up --build` is all that is required.
+services:
+  # ---------------------------------------------------------------------------
+  # Neo4j: the graph database that stores the architecture map.
+  # ---------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5.20-community
+    container_name: vectograph-neo4j
+    restart: unless-stopped
+    environment:
+      # Default credentials. Override via .env for a real deployment.
+      NEO4J_AUTH: "${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-vectograph}"
+      # Allow the backend to use the neo4j+s-less bolt scheme without certs.
+      NEO4J_server_memory_heap_initial__size: "256m"
+      NEO4J_server_memory_heap_max__size: "512m"
+      NEO4J_server_memory_pagecache_size: "256m"
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"   # Neo4j Browser UI
+      - "${NEO4J_BOLT_PORT:-7687}:7687"   # Bolt protocol (backend)
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      # The backend waits for this to pass before starting.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - vectograph
+
+  # ---------------------------------------------------------------------------
+  # Backend: FastAPI scanner engine + Neo4j writer/reader.
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vectograph-backend
+    restart: unless-stopped
+    environment:
+      NEO4J_URI: "bolt://neo4j:7687"
+      NEO4J_USER: "${NEO4J_USER:-neo4j}"
+      NEO4J_PASSWORD: "${NEO4J_PASSWORD:-vectograph}"
+      # Comma separated list of origins allowed to call the API.
+      CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-5173},http://127.0.0.1:${FRONTEND_PORT:-5173}"
+      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-50}"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      # Live-reload during development.
+      - ./backend/app:/app/app
+    networks:
+      - vectograph
+
+  # ---------------------------------------------------------------------------
+  # Frontend: React (Vite) dev server serving the interactive graph UI.
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vectograph-frontend
+    restart: unless-stopped
+    environment:
+      # The browser (not the container) reaches the backend through localhost.
+      VITE_API_URL: "http://localhost:${BACKEND_PORT:-8000}"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+    volumes:
+      # Live-reload during development. node_modules stays inside the image.
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+    networks:
+      - vectograph
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+
+networks:
+  vectograph:
+    driver: bridge
